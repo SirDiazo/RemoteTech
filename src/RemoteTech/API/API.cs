@@ -1,19 +1,30 @@
-﻿using System;
+﻿using RemoteTech.RangeModel;
+using RemoteTech.SimpleTypes;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using RemoteTech.RangeModel;
-using RemoteTech.SimpleTypes;
 
 namespace RemoteTech.API
 {
     public static class API
     {
+        public static bool HasLocalControl(Guid id)
+        {
+            var vessel = FlightGlobals.Vessels.FirstOrDefault(v => v.id == id);
+            if (vessel == null) return false;
+
+            RTLog.Verbose("Flight: {0} HasLocalControl: {1}", RTLogLevel.API, id, vessel.HasLocalControl());
+
+            return vessel.HasLocalControl();
+        }
+
         public static bool HasFlightComputer(Guid id)
         {
             var satellite = RTCore.Instance.Satellites[id];
             if (satellite == null) return false;
             var hasFlightComputer = satellite.FlightComputer != null;
-            RTLog.Verbose("Flight: {0} HasFlightComputer: {1}", id, hasFlightComputer);
+            RTLog.Verbose("Flight: {0} HasFlightComputer: {1}", RTLogLevel.API, id, hasFlightComputer);
+
             return hasFlightComputer;
         }
 
@@ -25,7 +36,7 @@ namespace RemoteTech.API
             {
                 if (spu.FlightComputer == null) continue;
                 if (spu.FlightComputer.SanctionedPilots.Contains(autopilot)) continue;
-                RTLog.Verbose("Flight: {0} Adding Sanctioned Pilot", id);
+                RTLog.Verbose("Flight: {0} Adding Sanctioned Pilot", RTLogLevel.API, id);
                 spu.FlightComputer.SanctionedPilots.Add(autopilot);
             }
         }
@@ -37,7 +48,7 @@ namespace RemoteTech.API
             foreach (var spu in satellite.SignalProcessors)
             {
                 if (spu.FlightComputer == null) continue;
-                RTLog.Verbose("Flight: {0} Removing Sanctioned Pilot", id);
+                RTLog.Verbose("Flight: {0} Removing Sanctioned Pilot", RTLogLevel.API, id);
                 spu.FlightComputer.SanctionedPilots.Remove(autopilot);
             }
         }
@@ -46,7 +57,7 @@ namespace RemoteTech.API
         {
             var satellite = RTCore.Instance.Satellites[id];
             var hasConnection = RTCore.Instance.Network[satellite].Any();
-            RTLog.Verbose("Flight: {0} Has Connection: {1}", id, hasConnection);
+            RTLog.Verbose("Flight: {0} Has Connection: {1}", RTLogLevel.API, id, hasConnection);
             return hasConnection;
         }
 
@@ -54,7 +65,7 @@ namespace RemoteTech.API
         {
             var satellite = RTCore.Instance.Satellites[id];
             var connectedToKerbin = RTCore.Instance.Network[satellite].Any(r => RTCore.Instance.Network.GroundStations.ContainsKey(r.Goal.Guid));
-            RTLog.Verbose("Flight: {0} Has Connection to Kerbin: {1}", id, connectedToKerbin);
+            RTLog.Verbose("Flight: {0} Has Connection to Kerbin: {1}", RTLogLevel.API, id, connectedToKerbin);
             return connectedToKerbin;
         }
 
@@ -63,7 +74,7 @@ namespace RemoteTech.API
             var satellite = RTCore.Instance.Satellites[id];
             if (!RTCore.Instance.Network[satellite].Any()) return Double.PositiveInfinity;
             var shortestDelay = RTCore.Instance.Network[satellite].Min().Delay;
-            RTLog.Verbose("Flight: Shortest signal delay from {0} to {1}", id, shortestDelay);
+            RTLog.Verbose("Flight: Shortest signal delay from {0} to {1}", RTLogLevel.API, id, shortestDelay);
             return shortestDelay;
         }
 
@@ -72,7 +83,7 @@ namespace RemoteTech.API
             var satellite = RTCore.Instance.Satellites[id];
             if (!RTCore.Instance.Network[satellite].Any(r => RTCore.Instance.Network.GroundStations.ContainsKey(r.Goal.Guid))) return Double.PositiveInfinity;
             var signalDelaytoKerbin = RTCore.Instance.Network[satellite].Where(r => RTCore.Instance.Network.GroundStations.ContainsKey(r.Goal.Guid)).Min().Delay;
-            RTLog.Verbose("Connection from {0} to Kerbin Delay: {1}", id, signalDelaytoKerbin);
+            RTLog.Verbose("Connection from {0} to Kerbin Delay: {1}", RTLogLevel.API, id, signalDelaytoKerbin);
             return signalDelaytoKerbin;
         }
 
@@ -88,41 +99,48 @@ namespace RemoteTech.API
 
             var path = NetworkPathfinder.Solve(satelliteA, satelliteB, neighbors, cost, heuristic);
             var delayBetween = path.Delay;
-            RTLog.Verbose("Connection from {0} to {1} Delay: {2}", a, b, delayBetween);
+            RTLog.Verbose("Connection from {0} to {1} Delay: {2}", RTLogLevel.API, a, b, delayBetween);
             return delayBetween;
         }
-        public static void ReceiveData(ConfigNode ExternalData) //exposed method called by other mods, passing a ConfigNode to RemoteTech
+
+        //exposed method called by other mods, passing a ConfigNode to RemoteTech
+        public static bool QueueCommandToFlightComputer(ConfigNode externalData)
         {
-            if (ExternalData != null) //check we were actually passed a config node
+            //check we were actually passed a config node
+            if (externalData == null) return false;
+            // check our min values
+            if (!externalData.HasValue("GUIDString") && !externalData.HasValue("Executor") && !externalData.HasValue("ReflectionType"))
             {
-                try
-                {
-                    RemoteTech.FlightComputer.Commands.ExternalAPICommand extCmd = new RemoteTech.FlightComputer.Commands.ExternalAPICommand() //make our command
-                    {
-                        externalData = ExternalData,
-                        TimeStamp = RTUtil.GameTime,
-                        description = ExternalData.GetValue("Description"), //string on GUI
-                        shortName = ExternalData.GetValue("ShortName"), //???
-                        reflectionGetType = ExternalData.GetValue("ReflectionGetType"), //required for reflection back
-                        reflectionInvokeMember = ExternalData.GetValue("ReflectionInvokeMember"), //required 
-                        vslGUIDstr = ExternalData.GetValue("GUIDString"),
-                    };
-                    foreach (Vessel vsl2 in FlightGlobals.Vessels) //can not find a Guid.Parse method, so do it this way
-                    {
-                        if (vsl2.id.ToString() == extCmd.vslGUIDstr)
-                        {
-                            extCmd.vslGUID = vsl2.id;
-                            extCmd.vsl = vsl2;
-                        }
-                    }
-                    RemoteTech.FlightComputer.FlightComputer fltComp = RTCore.Instance.Satellites[extCmd.vslGUID].FlightComputer;
-                    fltComp.Enqueue(extCmd);
-                }
-                catch
-                {
-                    RTDebugUnit.print("RT Error: Invalid ConfigNode passed by other mod");
-                }
+                return false;
             }
+
+            try
+            {
+                Guid externalVesselId = new Guid(externalData.GetValue("GUIDString"));
+                // you can only push a new external command if the vessel guid is the current active vessel
+                if (FlightGlobals.ActiveVessel.id != externalVesselId)
+                {
+                    RTLog.Verbose("Passed Guid is not the active Vessels guid", RTLogLevel.API);
+                    return false;
+                }
+
+                // maybe we should look if this vessel hasLocal controll or not. If so, we can execute the command
+                // immediately
+
+                // get the flightcomputer
+                FlightComputer.FlightComputer computer = RTCore.Instance.Satellites[externalVesselId].FlightComputer;
+
+                var extCmd = FlightComputer.Commands.ExternalAPICommand.FromExternal(externalData);
+
+                computer.Enqueue(extCmd);
+                return true;
+            }
+            catch(Exception ex)
+            {
+                RTLog.Verbose(ex.Message, RTLogLevel.API);
+            }
+
+            return false;
         }
     }
 }

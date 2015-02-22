@@ -49,6 +49,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AddOns\ControlLockAPI.cs" />
     <Compile Include="API\API.cs" />
     <Compile Include="FlightComputer\Commands\AbstractCommand.cs" />
     <Compile Include="FlightComputer\Commands\ExternalAPICommand.cs" />
@@ -94,6 +95,7 @@
     <Compile Include="RTUtil.cs" />
     <Compile Include="SatelliteManager.cs" />
     <Compile Include="AntennaManager.cs" />
+    <Compile Include="SimpleTypes\AddOn.cs" />
     <Compile Include="SimpleTypes\BidirectionalEdge.cs" />
     <Compile Include="SimpleTypes\BinaryHeap.cs" />
     <Compile Include="SimpleTypes\CachedField.cs" />
@@ -108,6 +110,7 @@
     <Compile Include="UI\AntennaFragment.cs" />
     <Compile Include="UI\AntennaWindow.cs" />
     <Compile Include="UI\AttitudeFragment.cs" />
+    <Compile Include="UI\DebugWindow.cs" />
     <Compile Include="UI\FocusOverlay.cs" />
     <Compile Include="UI\FocusFragment.cs" />
     <Compile Include="UI\FlightComputerWindow.cs" />
@@ -123,6 +126,7 @@
     <Compile Include="UI\TargetInfoFragment.cs" />
     <Compile Include="UI\TargetInfoWindow.cs" />
     <Compile Include="UI\TimeWarpDecorator.cs" />
+    <Compile Include="VesselExtension.cs" />
     <Compile Include="VesselSatellite.cs" />
     <Compile Include="RangeModel\AbstractRangeModel.cs" />
     <Compile Include="NetworkFeedback.cs" />

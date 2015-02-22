@@ -7,17 +7,22 @@ namespace RemoteTech.FlightComputer
 {
     public class EventCommand : AbstractCommand
     {
+        // Guiname of the BaseEvent
         [Persistent] public string GUIName;
-        [Persistent] public int PartId;
+        // Name of the BaseEvent
+        [Persistent] public string Name;
+        // flight id of the part by this BaseEvent
+        [Persistent] public uint flightID;
+        // PartModule of the part by this BaseEvent
         [Persistent] public string Module;
-
+        // BaseEvent to invoke
         public BaseEvent BaseEvent = null;
 
         public override String Description
         {
             get
             {
-                return BaseEvent.listParent.part.partInfo.title + ": " + BaseEvent.GUIName +
+                return ((this.BaseEvent != null) ? this.BaseEvent.listParent.part.partInfo.title + ": " + this.GUIName : "none") +
                         Environment.NewLine + base.Description;
             }
         }
@@ -25,13 +30,14 @@ namespace RemoteTech.FlightComputer
         {
             get
             {
-                return BaseEvent.GUIName;
+                return (this.BaseEvent != null) ? this.BaseEvent.GUIName : "none";
             }
         }
          
         public override bool Pop(FlightComputer f)
         {
-            BaseEvent.Invoke();
+            if (this.BaseEvent != null)
+                this.BaseEvent.Invoke();
             
             return false;
         }
@@ -42,8 +48,6 @@ namespace RemoteTech.FlightComputer
             {
                 BaseEvent = ev,
                 GUIName = ev.GUIName,
-                PartId = FlightGlobals.ActiveVessel.parts.ToList().IndexOf(ev.listParent.part),
-                Module = ev.listParent.module.ClassName.ToString(),
                 TimeStamp = RTUtil.GameTime,
             };
         }
@@ -51,21 +55,67 @@ namespace RemoteTech.FlightComputer
         /// <summary>
         /// Load infos into this object and create a new BaseEvent
         /// </summary>
-        public override void Load(ConfigNode n, FlightComputer fc)
+        /// <returns>true - loaded successfull</returns>
+        public override bool Load(ConfigNode n, FlightComputer fc)
         {
-            base.Load(n, fc);
-
-            PartId = int.Parse(n.GetValue("PartId"));
-            Module = n.GetValue("Module");
-            GUIName = n.GetValue("GUIName");
-
-            Part part = FlightGlobals.ActiveVessel.parts[PartId];
-            PartModule partmodule = part.Modules[Module];
-            BaseEventList eventlist = new BaseEventList(part, partmodule);
-            if (eventlist.Count > 0)
+            if(base.Load(n, fc))
             {
-                BaseEvent = eventlist.Where(ba => ba.GUIName == GUIName).FirstOrDefault();
+                // deprecated since 1.6.2, we need this for upgrading from 1.6.x => 1.6.2
+                int PartId = 0;
+                {
+                    if (n.HasValue("PartId"))
+                        PartId = int.Parse(n.GetValue("PartId"));
+                }
+
+                if (n.HasValue("flightID"))
+                    this.flightID = uint.Parse(n.GetValue("flightID"));
+
+                this.Module = n.GetValue("Module");
+                this.GUIName = n.GetValue("GUIName");
+                this.Name = n.GetValue("Name");
+
+                RTLog.Notify("Try to load an EventCommand from persistent with {0},{1},{2},{3},{4}",
+                             PartId, this.flightID, this.Module, this.GUIName, this.Name);
+
+                Part part = null;
+                var partlist = FlightGlobals.ActiveVessel.parts;
+
+                if (this.flightID == 0)
+                {
+                    // only look with the partid if we've enough parts
+                    if (PartId < partlist.Count)
+                        part = partlist.ElementAt(PartId);
+                }
+                else
+                {
+                    part = partlist.Where(p => p.flightID == this.flightID).FirstOrDefault();
+                }
+
+                if (part == null) return false;
+
+                PartModule partmodule = part.Modules[Module];
+                if (partmodule == null) return false;
+
+                BaseEventList eventlist = new BaseEventList(part, partmodule);
+                if (eventlist.Count <= 0) return false;
+
+                this.BaseEvent = eventlist.Where(ba => (ba.GUIName == this.GUIName || ba.name == this.Name)).FirstOrDefault();
+                return true;
             }
+            return false;
+        }
+
+        /// <summary>
+        /// Save the BaseEvent to the persistent
+        /// </summary>
+        public override void Save(ConfigNode n, FlightComputer fc)
+        {
+            this.GUIName = this.BaseEvent.GUIName;
+            this.flightID = this.BaseEvent.listParent.module.part.flightID;
+            this.Module = this.BaseEvent.listParent.module.ClassName.ToString();
+            this.Name = this.BaseEvent.name;
+
+            base.Save(n, fc);
         }
     }
 }

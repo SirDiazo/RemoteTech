@@ -27,8 +27,12 @@ namespace RemoteTech.FlightComputer.Commands
         {
             f.DelayedTarget = Target;
             f.lastTarget = this;
-            // Switch the vessels target
-            FlightGlobals.fetch.SetVesselTarget(Target);
+
+            if (Target != null && Target != FlightGlobals.fetch.VesselTarget)
+            {
+                // Switch the vessels target
+                FlightGlobals.fetch.SetVesselTarget(Target);
+            }
 
             return true;
         }
@@ -53,29 +57,33 @@ namespace RemoteTech.FlightComputer.Commands
         /// </summary>
         /// <param name="n">Node with the command infos</param>
         /// <param name="fc">Current flightcomputer</param>
-        public override void Load(ConfigNode n, FlightComputer fc)
+        /// <returns>true - loaded successfull</returns>
+        public override bool Load(ConfigNode n, FlightComputer fc)
         {
-            base.Load(n, fc);
-
-            switch (TargetType)
+            if(base.Load(n, fc))
             {
-                case "Vessel":
-                    {
-                        Guid Vesselid = new Guid(TargetId);
-                        Target = FlightGlobals.Vessels.Where(v => v.id == Vesselid).FirstOrDefault();
-                        break;
-                    }
-                case "CelestialBody":
-                    {
-                        Target = FlightGlobals.Bodies.ElementAt(int.Parse(TargetId));
-                        break;
-                    }
-                default:
-                    {
-                        Target = null;
-                        break;
-                    }
+                switch (TargetType)
+                {
+                    case "Vessel":
+                        {
+                            Guid Vesselid = new Guid(TargetId);
+                            Target = FlightGlobals.Vessels.Where(v => v.id == Vesselid).FirstOrDefault();
+                            break;
+                        }
+                    case "CelestialBody":
+                        {
+                            Target = FlightGlobals.Bodies.ElementAt(int.Parse(TargetId));
+                            break;
+                        }
+                    default:
+                        {
+                            Target = null;
+                            break;
+                        }
+                }
+                return true;
             }
+            return false;
         }
 
         /// <summary>
@@ -87,26 +95,29 @@ namespace RemoteTech.FlightComputer.Commands
         public override void Save(ConfigNode n, FlightComputer fc)
         {
             if (Target != null)
+            {
                 TargetType = Target.GetType().ToString();
 
-            switch (TargetType)
-            {
-                case "Vessel":
-                    {
-                        TargetId = ((Vessel)Target).id.ToString();
-                        break;
-                    }
-                case "CelestialBody":
-                    {
-                        TargetId = FlightGlobals.Bodies.ToList().IndexOf(((CelestialBody)Target)).ToString();
-                        break;
-                    }
-                default:
-                    {
-                        TargetId = null;
-                        break;
-                    }
+                switch (TargetType)
+                {
+                    case "Vessel":
+                        {
+                            TargetId = ((Vessel)Target).id.ToString();
+                            break;
+                        }
+                    case "CelestialBody":
+                        {
+                            TargetId = FlightGlobals.Bodies.ToList().IndexOf(((CelestialBody)Target)).ToString();
+                            break;
+                        }
+                    default:
+                        {
+                            TargetId = null;
+                            break;
+                        }
+                }
             }
+
             base.Save(n, fc);
         }
     }
